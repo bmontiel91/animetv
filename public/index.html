@@ -491,10 +491,12 @@ async function loadSeasonData(year, season) {
   loading.style.display = '';
 
   try {
-    const res = await fetch(`${JIKAN_API}/seasons/${year}/${season}?limit=30&sfw=true&order_by=score&sort=desc`);
+    const res = await fetch(`${JIKAN_API}/seasons/${year}/${season}?limit=30&sfw=true`);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
     const items = json.data || [];
+    // Sort by score descending
+    items.sort((a, b) => (b.score || 0) - (a.score || 0));
     loading.style.display = 'none';
 
     if (items.length === 0) {
