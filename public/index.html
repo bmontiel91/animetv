@@ -333,6 +333,21 @@
   .hero { text-align: center; padding: 50px 20px; }
   .hero h1 { font-size: 28px; margin-bottom: 8px; }
   .hero p { color: var(--text2); font-size: 14px; max-width: 450px; margin: 0 auto; }
+
+  /* Seasonal */
+  .seasonal-section { margin: 30px 0; }
+  .seasonal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
+  }
+  .seasonal-header h2 { font-size: 18px; }
+  .season-nav { display: flex; align-items: center; gap: 8px; }
+  .season-label {
+    font-size: 14px; font-weight: 600; color: var(--text);
+    min-width: 130px; text-align: center;
+  }
+  .season-loading { text-align: center; padding: 40px 0; }
+
   .popular-searches { margin-top: 30px; }
   .popular-searches h3 { margin-bottom: 12px; font-size: 14px; color: var(--text2); }
   .popular-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
@@ -371,8 +386,26 @@
   <div id="view-home" class="view active">
     <div class="hero">
       <h1>🎬 AnimeTV</h1>
-      <p>Busca en español o japonés. Elige entre AnimeAV1 o MyAnimeList como fuente.</p>
+      <p>Busca en español o japonés. Elige entre AnimeAV1 o MyAnimeList.</p>
     </div>
+
+    <!-- Seasonal Directory -->
+    <div class="seasonal-section">
+      <div class="seasonal-header">
+        <h2>📅 <span id="seasonTitle">Temporada Actual</span></h2>
+        <div class="season-nav">
+          <button class="btn btn-secondary" onclick="changeSeason(-1)" title="Anterior">←</button>
+          <span id="seasonLabel" class="season-label">Cargando...</span>
+          <button class="btn btn-secondary" onclick="changeSeason(1)" title="Siguiente">→</button>
+        </div>
+      </div>
+      <div id="seasonGrid" class="anime-grid"></div>
+      <div class="season-loading" id="seasonLoading">
+        <div class="spinner"></div>
+        <p style="color:var(--text2);font-size:13px;">Cargando temporada...</p>
+      </div>
+    </div>
+
     <div class="popular-searches">
       <h3>🔥 Búsquedas populares</h3>
       <div class="popular-tags">
@@ -424,6 +457,125 @@ const JIKAN_API = 'https://api.jikan.moe/v4';
 let searchSource = 'animeav1';
 let currentAnimeUrl = '';
 let currentEpisodeUrl = '';
+
+// Seasonal state
+let seasonState = { year: 0, season: '' };
+const SEASON_ORDER = ['winter', 'spring', 'summer', 'fall'];
+
+function getCurrentSeason() {
+  const m = new Date().getMonth() + 1;
+  const s = m <= 3 ? 'winter' : m <= 6 ? 'spring' : m <= 9 ? 'summer' : 'fall';
+  return { year: new Date().getFullYear(), season: s };
+}
+
+function seasonLabel(year, season) {
+  const names = { winter: '❄️ Invierno', spring: '🌸 Primavera', summer: '☀️ Verano', fall: '🍂 Otoño' };
+  return `${names[season] || season} ${year}`;
+}
+
+// Load season on startup
+document.addEventListener('DOMContentLoaded', () => {
+  seasonState = getCurrentSeason();
+  loadSeasonData(seasonState.year, seasonState.season);
+});
+
+async function loadSeasonData(year, season) {
+  const grid = document.getElementById('seasonGrid');
+  const loading = document.getElementById('seasonLoading');
+  const label = document.getElementById('seasonLabel');
+  const title = document.getElementById('seasonTitle');
+
+  label.textContent = seasonLabel(year, season);
+  title.textContent = 'Temporada ' + (seasonState.year === year && seasonState.season === season ? 'Actual' : seasonLabel(year, season));
+  grid.innerHTML = '';
+  loading.style.display = '';
+
+  try {
+    const res = await fetch(`${JIKAN_API}/seasons/${year}/${season}?limit=30&sfw=true&order_by=score&sort=desc`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    const items = json.data || [];
+    loading.style.display = 'none';
+
+    if (items.length === 0) {
+      grid.innerHTML = '<p style="color:var(--text2);text-align:center;padding:30px;">Sin datos para esta temporada</p>';
+      return;
+    }
+
+    renderSeasonGrid(items);
+  } catch (e) {
+    loading.style.display = 'none';
+    grid.innerHTML = `<div class="error-msg">❌ Error al cargar temporada: ${e.message}</div>`;
+  }
+}
+
+function renderSeasonGrid(items) {
+  const grid = document.getElementById('seasonGrid');
+  let html = '';
+  items.forEach((a, i) => {
+    const img = a.images?.jpg?.image_url || a.images?.webp?.image_url || '';
+    const initial = (a.title || '?')[0].toUpperCase();
+    const imgTag = img
+      ? `<img src="${img}" alt="${a.title}" loading="lazy" onerror="this.parentNode.innerHTML='<span class=placeholder>${initial}</span>'">`
+      : `<span class="placeholder">${initial}</span>`;
+    const jpLabel = a.title_japanese && a.title_japanese !== a.title ? `<span class="jp-label">${a.title_japanese}</span>` : '';
+    html += `<div class="anime-card" onclick="loadJikanFromSeason(${a.mal_id},'${(a.title||'').replace(/'/g,"\\'")}')" style="animation-delay:${i*0.02}s">
+      <div class="card-img">${imgTag}${jpLabel}</div>
+      <div class="card-info">
+        <h3 title="${(a.title||'').replace(/"/g,'&quot;')}">${a.title||''}</h3>
+        <div class="meta">
+          ${a.type ? '<span>'+a.type+'</span>' : ''}
+          ${a.episodes ? '<span>'+a.episodes+' ep.</span>' : ''}
+          ${a.score ? '<span>⭐'+a.score+'</span>' : ''}
+        </div>
+      </div>
+    </div>`;
+  });
+  grid.innerHTML = html;
+}
+
+async function loadJikanFromSeason(malId, title) {
+  document.getElementById('detailTitle').textContent = 'Buscando en AnimeAV1...';
+  document.getElementById('detailContent').innerHTML = `<div class="loading"><div class="spinner"></div>Localizando episodios...</div>`;
+  showView('detail');
+
+  try {
+    const data = await apiGet('/api/v1/anime/search', { q: title });
+    const results = data.data?.results || [];
+    let found = results.find(r => r.title.toLowerCase() === title.toLowerCase()) || results[0];
+
+    if (found?.url) {
+      await loadAnimeDetail(found.url);
+    } else {
+      // Show MAL data with a note
+      const res = await fetch(`${JIKAN_API}/anime/${malId}`);
+      const json = await res.json();
+      const mal = json.data;
+      document.getElementById('detailContent').innerHTML = `
+        <div class="anime-detail-header">
+          <div class="poster"><img src="${mal.images?.jpg?.image_url||''}" alt="${mal.title}"></div>
+          <div class="info"><h2>${mal.title}</h2>
+            ${mal.title_japanese ? '<p style="color:var(--text2);font-size:13px;margin:0 0 10px;">'+mal.title_japanese+'</p>' : ''}
+            <div class="tags">${mal.type?'<span>'+mal.type+'</span>':''}${mal.status?'<span>'+mal.status+'</span>':''}${mal.episodes?'<span>'+mal.episodes+' ep.</span>':''}${mal.score?'<span>⭐ '+mal.score+'</span>':''}</div>
+            ${mal.synopsis ? '<div class="description">'+mal.synopsis.slice(0,400)+'</div>' : ''}
+          </div>
+        </div>
+        <div class="error-msg" style="margin-top:20px;">⚠️ No disponible en AnimeAV1. Prueba buscándolo por otro nombre.</div>`;
+    }
+  } catch(e) {
+    document.getElementById('detailContent').innerHTML = `<div class="error-msg">❌ ${e.message}</div>`;
+  }
+}
+
+function changeSeason(dir) {
+  let idx = SEASON_ORDER.indexOf(seasonState.season);
+  let y = seasonState.year;
+  idx += dir;
+  if (idx < 0) { idx = 3; y--; }
+  if (idx > 3) { idx = 0; y++; }
+  seasonState = { year: y, season: SEASON_ORDER[idx] };
+  loadSeasonData(y, SEASON_ORDER[idx]);
+}
 
 function setSource(src) {
   searchSource = src;
