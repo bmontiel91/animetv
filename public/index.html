@@ -779,7 +779,7 @@ function selectServer(index, variant) {
   const urlLower = url.toLowerCase();
 
   let html = '';
-  if (urlLower.includes('.m3u8') || urlLower.match(/player\.(zilla|me|io)/)) {
+  if (urlLower.includes('.m3u8')) {
     html = `<div id="hlsContainer" style="width:100%;height:100%;background:#000;position:relative;">
       <video id="hlsVideo" controls autoplay playsinline style="width:100%;height:100%;"></video>
       <div id="hlsLoadMsg" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#999;text-align:center;">
