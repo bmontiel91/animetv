@@ -179,52 +179,8 @@ async function getEpisodeLinks(urlCandidate, includeMega, excludeServers) {
   };
 }
 
-async function getRecentEpisodes(domainCandidate) {
-  const forcedProvider = findProviderByDomain(domainCandidate) || findProviderById(domainCandidate);
-  const providersToTry = forcedProvider ? [forcedProvider] : PROVIDERS;
-
-  let lastEmpty = null;
-  const errors = [];
-
-  for (const provider of providersToTry) {
-    if (typeof provider.service.getRecentEpisodes !== "function") {
-      continue;
-    }
-    try {
-      const result = await provider.service.getRecentEpisodes(provider.domains[0]);
-      const count = result?.data?.count ?? 0;
-      if (count > 0 || forcedProvider) {
-        return {
-          ...result,
-          source: result?.source || provider.id,
-        };
-      }
-
-      if (!lastEmpty) {
-        lastEmpty = {
-          ...result,
-          source: result?.source || provider.id,
-        };
-      }
-    } catch (error) {
-      errors.push({ provider: provider.id, error });
-    }
-  }
-
-  if (lastEmpty) {
-    return lastEmpty;
-  }
-
-  if (errors.length === providersToTry.length && errors[0]?.error) {
-    throw errors[0].error;
-  }
-
-  throw new ApiError(502, "No se pudo obtener episodios recientes");
-}
-
 module.exports = {
   searchAnime,
   getAnimeInfo,
   getEpisodeLinks,
-  getRecentEpisodes,
 };

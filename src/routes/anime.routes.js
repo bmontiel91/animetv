@@ -51,14 +51,6 @@ router.get(
   })
 );
 
-router.get(
-  "/recent",
-  asyncHandler(async (req, res) => {
-    const response = await animeService.getRecentEpisodes(req.query.domain);
-    res.status(200).json(response);
-  })
-);
-
 router.post(
   "/download",
   asyncHandler(async (req, res) => {

@@ -348,8 +348,10 @@
   }
   .season-loading { text-align: center; padding: 40px 0; }
   .anime-card .card-img { position: relative; }
-  .ep-badge { position:absolute; top:8px; left:8px; background:var(--accent); color:#fff; font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; z-index:2; }
-  .time-badge { position:absolute; bottom:8px; left:8px; background:rgba(0,0,0,.65); color:#fff; font-size:10px; padding:2px 6px; border-radius:5px; z-index:2; }
+  .user-chip { display:inline-flex; align-items:center; gap:8px; margin:4px; padding:8px 14px; background:var(--bg2); border:1.5px solid var(--border); border-radius:20px; cursor:pointer; font-size:14px; }
+  .user-chip.active { border-color:var(--accent); background:var(--bg3); color:var(--accent); font-weight:700; }
+  .user-chip .del { color:var(--text2); font-size:12px; padding:0 4px; }
+  .user-chip .del:hover { color:#e74c3c; }
   .fav-btn { background:none; border:none; font-size:22px; cursor:pointer; padding:0 4px; vertical-align:middle; }
   .hist-item { margin:6px 0; padding:10px 12px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; cursor:pointer; font-size:14px; }
   .hist-item:hover { border-color: var(--accent); }
@@ -405,7 +407,6 @@
           <button class="btn btn-secondary" onclick="changeSeason(-1)" title="Anterior">←</button>
           <span id="seasonLabel" class="season-label">Cargando...</span>
           <button class="btn btn-secondary" onclick="changeSeason(1)" title="Siguiente">→</button>
-          <button class="btn" onclick="showRecent()" title="Últimos capítulos" style="margin-left:6px;">🆕 Capítulos</button>
         </div>
       </div>
       <div id="seasonGrid" class="anime-grid"></div>
@@ -440,24 +441,17 @@
     <div id="searchResults"></div>
   </div>
 
-  <!-- RECENT EPISODES -->
-  <div id="view-recent" class="view">
-    <div class="back-bar">
-      <button class="btn btn-secondary" onclick="showView('home')">←</button>
-      <h1 id="recentTitle">🆕 Últimos capítulos</h1>
-    </div>
-    <div id="recentResults"></div>
-  </div>
-
   <!-- PROFILE -->
   <div id="view-profile" class="view">
     <div class="back-bar">
       <button class="btn btn-secondary" onclick="showView('home')">←</button>
-      <h1>👤 Mi perfil</h1>
+      <h1>👤 Perfiles</h1>
     </div>
-    <h3 class="section-title">🔖 Favoritos</h3>
+    <div id="userList" style="padding:4px;"></div>
+    <button class="btn" style="width:100%;margin:8px 4px;" onclick="newUser()">➕ Nueva cuenta</button>
+    <h3 class="section-title">🔖 Favoritos · <span id="favOwner"></span></h3>
     <div id="favGrid"></div>
-    <h3 class="section-title">🕘 Historial</h3>
+    <h3 class="section-title">🕘 Historial · <span id="histOwner"></span></h3>
     <div id="histList"></div>
     <div style="padding:20px 4px;">
       <button class="btn btn-secondary" onclick="clearHistory()">🗑 Borrar historial</button>
@@ -732,58 +726,43 @@ async function apiGet(endpoint, params) {
   return res.json();
 }
 
-// ====== RECENT EPISODES ======
-async function showRecent() {
-  document.getElementById('recentResults').innerHTML = '<div class="loading"><div class="spinner"></div>Cargando últimos capítulos...</div>';
-  showView('recent');
-  try {
-    const data = await apiGet('/api/v1/anime/recent');
-    renderRecent(data.data?.results || []);
-  } catch (e) {
-    document.getElementById('recentResults').innerHTML = '<div class="error-msg">❌ ' + e.message + '</div>';
-  }
-}
-
-function renderRecent(results) {
-  const c = document.getElementById('recentResults');
-  if (!results.length) {
-    c.innerHTML = '<div class="no-results"><h2>Sin capítulos recientes</h2><p>Intenta de nuevo en unos minutos</p></div>';
-    return;
-  }
-  let h = '<div class="anime-grid">';
-  results.forEach(r => {
-    const img = r.image || '';
-    const initial = (r.title || '?')[0].toUpperCase();
-    const imgTag = img
-      ? '<img src="' + img + '" alt="' + (r.title||'') + '" loading="lazy" onerror="this.parentNode.innerHTML=\'<span class=placeholder>' + initial + '</span>\'">'
-      : '<span class="placeholder">' + initial + '</span>';
-    const t = String(r.title || '').replace(/"/g, '&quot;').replace(/'/g, "\\'");
-    h += '<div class="anime-card" onclick="loadRecentEpisode(\'' + r.url + '\',\'' + t + '\')">';
-    h += '<div class="card-img">' + imgTag;
-    h += '<span class="ep-badge">Ep. ' + (r.episode || '?') + '</span>';
-    if (r.time) h += '<span class="time-badge">' + r.time + '</span>';
-    h += '</div><div class="card-info"><h3 title="' + String(r.title||'').replace(/"/g,'&quot;') + '">' + (r.title||'') + '</h3></div></div>';
-  });
-  h += '</div>';
-  c.innerHTML = h;
-}
-
-async function loadRecentEpisode(url, title) {
-  const parts = url.split('/').filter(Boolean);
-  const animeBase = /^https?:\/\//i.test(url) ? ('https://' + parts.slice(0, 3).join('/')) : ('/' + parts.slice(0, 2).join('/'));
-  const mEp = /\/(\d+)\s*$/.exec(url);
-  addHistory({ url: animeBase, title: title, episode: mEp ? mEp[1] : '', episodeUrl: url, image: '' });
-  await loadAnimeDetail(animeBase);
-}
-
-// ====== PROFILE / STORAGE (localStorage) ======
+// ====== PROFILE / CUENTAS (localStorage) ======
 function storageGet(key, def) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch (_) { return def; } }
 function storageSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (_) {} }
-const HIST_KEY = 'animetv.history';
-const FAV_KEY = 'animetv.favs';
+function storageRemove(key) { try { localStorage.removeItem(key); } catch (_) {} }
+const USERS_KEY = 'animetv.users';
+const ACTIVE_KEY = 'animetv.activeUser';
+const LEGACY_HIST = 'animetv.history';
+const LEGACY_FAVS = 'animetv.favs';
 
-function getHistory() { return storageGet(HIST_KEY, []); }
-function getFavs() { return storageGet(FAV_KEY, []); }
+function getUsers() { const u = storageGet(USERS_KEY, null); return Array.isArray(u) ? u : []; }
+
+function getActiveUser() {
+  let users = getUsers();
+  if (!users.length) {
+    const legacyH = storageGet(LEGACY_HIST, null);
+    const legacyF = storageGet(LEGACY_FAVS, null);
+    const name = (Array.isArray(legacyH) && legacyH.length) || (Array.isArray(legacyF) && legacyF.length) ? 'Mi Perfil' : 'Perfil 1';
+    const u = { id: 'u1', name: name, createdAt: Date.now() };
+    storageSet(USERS_KEY, [u]);
+    storageSet(ACTIVE_KEY, u.id);
+    if (Array.isArray(legacyH)) { storageSet('animetv.hist_' + u.id, legacyH); storageRemove(LEGACY_HIST); }
+    if (Array.isArray(legacyF)) { storageSet('animetv.favs_' + u.id, legacyF); storageRemove(LEGACY_FAVS); }
+    return u;
+  }
+  let id = storageGet(ACTIVE_KEY, '');
+  if (!users.some(u => u.id === id)) {
+    id = users[0].id;
+    storageSet(ACTIVE_KEY, id);
+  }
+  return users.find(u => u.id === id) || users[0];
+}
+
+function histKey() { const u = getActiveUser(); return 'animetv.hist_' + (u ? u.id : 'default'); }
+function favKey() { const u = getActiveUser(); return 'animetv.favs_' + (u ? u.id : 'default'); }
+
+function getHistory() { const h = storageGet(histKey(), null); return Array.isArray(h) ? h : []; }
+function getFavs() { const f = storageGet(favKey(), null); return Array.isArray(f) ? f : []; }
 
 function addHistory(item) {
   let h = getHistory();
@@ -792,7 +771,7 @@ function addHistory(item) {
   if (idx !== -1) h.splice(idx, 1);
   h.unshift(rec);
   if (h.length > 100) h = h.slice(0, 100);
-  storageSet(HIST_KEY, h);
+  storageSet(histKey(), h);
 }
 
 function isFav(url) { return getFavs().some(f => f.url === url); }
@@ -802,8 +781,53 @@ function toggleFav(anime) {
   const i = favs.findIndex(f => f.url === anime.url);
   if (i !== -1) favs.splice(i, 1);
   else favs.unshift({ url: anime.url, title: anime.title || '', image: anime.image || '', ts: Date.now() });
-  storageSet(FAV_KEY, favs);
+  storageSet(favKey(), favs);
   return isFav(anime.url);
+}
+
+function createUser(name) {
+  const users = getUsers();
+  const u = { id: 'u' + Date.now().toString(36), name: name, createdAt: Date.now() };
+  users.push(u);
+  storageSet(USERS_KEY, users);
+  storageSet(ACTIVE_KEY, u.id);
+  return u.id;
+}
+
+function switchUser(id) {
+  if (getUsers().some(u => u.id === id)) storageSet(ACTIVE_KEY, id);
+  showProfile();
+}
+
+function deleteUser(id) {
+  let users = getUsers();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) return;
+  users.splice(idx, 1);
+  storageSet(USERS_KEY, users);
+  storageRemove('animetv.hist_' + id);
+  storageRemove('animetv.favs_' + id);
+  const active = getActiveUser();
+  if (active.id === id) {
+    const next = users[0] || createUser('Perfil 1');
+    storageSet(ACTIVE_KEY, next.id);
+  }
+}
+
+function newUser() {
+  const name = prompt('Nombre de la cuenta:', '');
+  if (!name || !name.trim()) return;
+  createUser(name.trim());
+  showProfile();
+}
+
+function delUser(id) {
+  const users = getUsers();
+  const u = users.find(x => x.id === id);
+  if (!u) return;
+  if (!confirm('¿Eliminar la cuenta "' + u.name + '" y sus datos?')) return;
+  deleteUser(id);
+  showProfile();
 }
 
 function toggleFavDetail() {
@@ -819,44 +843,57 @@ function toggleFavDetail() {
 }
 
 function showProfile() {
+  const users = getUsers();
+  const active = getActiveUser();
+
+  let h = '';
+  users.forEach(u => {
+    const nm = String(u.name || '?').replace(/"/g, '&quot;').replace(/'/g, "\\'");
+    h += '<span class="user-chip' + (u.id === active.id ? ' active' : '') + '" onclick="switchUser(\'' + u.id + '\')">👤 ' + nm +
+      ' <span class="del" onclick="event.stopPropagation();delUser(\'' + u.id + '\')" title="Eliminar">✖</span></span>';
+  });
+  document.getElementById('userList').innerHTML = h || '<p style="color:var(--text2);padding:10px 4px;">Crea una cuenta para empezar ⬇</p>';
+  document.getElementById('favOwner').textContent = active.name;
+  document.getElementById('histOwner').textContent = active.name;
+
   const favs = getFavs();
   const fg = document.getElementById('favGrid');
   if (!favs.length) {
     fg.innerHTML = '<p style="color:var(--text2);padding:20px;">Sin favoritos aún. Toca ☆ en un anime para guardarlo aquí.</p>';
   } else {
-    let h = '<div class="anime-grid">';
+    let hh = '<div class="anime-grid">';
     favs.forEach(f => {
       const img = f.image || '';
       const initial = (f.title || '?')[0].toUpperCase();
       const imgTag = img
         ? '<img src="' + img + '" alt="' + (f.title||'') + '" loading="lazy" onerror="this.parentNode.innerHTML=\'<span class=placeholder>' + initial + '</span>\'">'
         : '<span class="placeholder">' + initial + '</span>';
-      h += '<div class="anime-card" onclick="loadAnimeDetail(\'' + f.url + '\')"><div class="card-img">' + imgTag + '</div><div class="card-info"><h3 title="' + String(f.title||'').replace(/"/g,'&quot;') + '">' + (f.title||'') + '</h3></div></div>';
+      hh += '<div class="anime-card" onclick="loadAnimeDetail(\'' + f.url + '\')"><div class="card-img">' + imgTag + '</div><div class="card-info"><h3 title="' + String(f.title||'').replace(/"/g,'&quot;') + '">' + (f.title||'') + '</h3></div></div>';
     });
-    h += '</div>';
-    fg.innerHTML = h;
+    hh += '</div>';
+    fg.innerHTML = hh;
   }
 
   const hist = getHistory();
   const hl = document.getElementById('histList');
   if (!hist.length) {
-    hl.innerHTML = '<p style="color:var(--text2);padding:20px;">Nada visto aún. Explora la temporada o los 🆕 capítulos.</p>';
+    hl.innerHTML = '<p style="color:var(--text2);padding:20px;">Nada visto aún en esta cuenta.</p>';
   } else {
-    let h = '';
+    let hh = '';
     hist.slice(0, 30).forEach(it => {
       const label = it.episode && it.episodeUrl ? (it.title + ' — Ep. ' + it.episode) : it.title;
       const t = String(label || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
       const resume = it.episodeUrl ? 'loadEpisode(\'' + it.episodeUrl + '\',\'' + t + '\')' : 'loadAnimeDetail(\'' + it.url + '\')';
-      h += '<div class="hist-item" onclick="' + resume + '">▶ ' + label + ' <span style="color:var(--text2);font-size:11px;">' + timeAgo(it.ts) + '</span></div>';
+      hh += '<div class="hist-item" onclick="' + resume + '">▶ ' + label + ' <span style="color:var(--text2);font-size:11px;">' + timeAgo(it.ts) + '</span></div>';
     });
-    hl.innerHTML = h;
+    hl.innerHTML = hh;
   }
   showView('profile');
 }
 
 function clearHistory() {
-  if (!confirm('¿Borrar todo el historial?')) return;
-  storageSet(HIST_KEY, []);
+  if (!confirm('¿Borrar el historial de esta cuenta?')) return;
+  storageSet(histKey(), []);
   document.getElementById('histList').innerHTML = '<p style="color:var(--text2);padding:20px;">Historial vacío.</p>';
 }
 
