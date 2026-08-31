@@ -984,7 +984,20 @@ function parseRecentEpisodesFromHtml(html, domain) {
     return results;
   }
 
-  const grid = episodesHeading.parent().next("div");
+  let grid = null;
+  let cursor = episodesHeading.parent();
+  for (let depth = 0; depth < 4 && cursor.length; depth++) {
+    const nextDiv = cursor.next("div");
+    if (nextDiv.length) {
+      grid = nextDiv;
+      break;
+    }
+    cursor = cursor.parent();
+  }
+  if (!grid) {
+    return results;
+  }
+
   grid.find("article").each(function () {
     const article = $(this);
     const link = article.find('a[href*="/media/"]').first();
