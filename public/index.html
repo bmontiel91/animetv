@@ -352,7 +352,8 @@
   .user-chip.active { border-color:var(--accent); background:var(--bg3); color:var(--accent); font-weight:700; }
   .user-chip .del { color:var(--text2); font-size:12px; padding:0 4px; }
   .user-chip .del:hover { color:#e74c3c; }
-  .fav-btn { background:none; border:none; font-size:22px; cursor:pointer; padding:0 4px; vertical-align:middle; }
+  .fav-btn { display:inline-block; margin-left:6px; padding:5px 14px; background:var(--bg3); border:1.5px solid var(--accent); border-radius:16px; color:var(--accent); font-size:13px; font-weight:700; cursor:pointer; vertical-align:middle; }
+  .fav-btn.faved { background:var(--accent); color:#fff; }
   .hist-item { margin:6px 0; padding:10px 12px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; cursor:pointer; font-size:14px; }
   .hist-item:hover { border-color: var(--accent); }
   .section-title { margin:18px 4px 8px; font-size:15px; }
@@ -839,7 +840,10 @@ function toggleFavDetail() {
   };
   const nowFav = toggleFav(anime);
   const b = document.getElementById('favBtn');
-  if (b) b.textContent = nowFav ? '★' : '☆';
+  if (b) {
+    b.textContent = nowFav ? '★ Favorito' : '☆ Favorito';
+    b.classList.toggle('faved', nowFav);
+  }
 }
 
 function showProfile() {
@@ -1111,7 +1115,7 @@ function renderAnimeDetail(anime) {
     <div class="anime-detail-header">
       <div class="poster">${posterHtml}</div>
       <div class="info">
-        <h2>${anime.title} <button class="fav-btn" id="favBtn" onclick="toggleFavDetail()" title="Favorito">${isFav(currentAnimeUrl) ? '★' : '☆'}</button></h2>
+        <h2>${anime.title} <button class="fav-btn${isFav(currentAnimeUrl) ? ' faved' : ''}" id="favBtn" onclick="toggleFavDetail()" title="Favorito">${isFav(currentAnimeUrl) ? '★ Favorito' : '☆ Favorito'}</button></h2>
         ${anime.titleJapanese ? '<p style="color:var(--text2);font-size:13px;margin-bottom:10px;">'+anime.titleJapanese+'</p>' : ''}
         <div class="tags">
           ${anime.type ? '<span>'+anime.type+'</span>' : ''}
