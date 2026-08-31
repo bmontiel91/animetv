@@ -964,8 +964,88 @@ async function getEpisodeLinks(urlCandidate, includeMegaRaw, excludeServersRaw) 
   };
 }
 
+// ── Recent episodes (homepage "Episodios" → "Recientemente Actualizado") ──
+let recentCache = { ts: 0, data: null };
+const RECENT_TTL_MS = Number(process.env.RECENT_TTL_MS || 10 * 60 * 1000);
+
+function parseRecentEpisodesFromHtml(html, domain) {
+  const $ = cheerio.load(html);
+  const results = [];
+
+  let episodesHeading = null;
+  $("h2").each(function () {
+    const text = $(this).text().trim().toLowerCase();
+    if (text === "episodios") {
+      episodesHeading = $(this);
+      return false;
+    }
+  });
+  if (!episodesHeading) {
+    return results;
+  }
+
+  const grid = episodesHeading.parent().next("div");
+  grid.find("article").each(function () {
+    const article = $(this);
+    const link = article.find('a[href*="/media/"]').first();
+    const href = link.attr("href") || "";
+    const url = resolveAbsoluteUrl(href, domain);
+    if (!url) {
+      return;
+    }
+
+    const title = article.find("div.text-2xs").first().text().trim();
+    const episode = article.find("div.bg-line span").first().text().trim();
+    const time = article.find("span.from-soft").first().text().trim();
+    const image = article.find("img").first().attr("src") || "";
+    const urlParts = url.split("/").filter(Boolean);
+
+    if (!title) {
+      return;
+    }
+
+    results.push({
+      title,
+      slug: urlParts[1] || null,
+      url,
+      episode: episode || urlParts[2] || null,
+      time: time || null,
+      image: resolveAbsoluteUrl(image, domain) || null,
+    });
+  });
+
+  return results;
+}
+
+async function getRecentEpisodes(domainCandidate) {
+  const domain = (domainCandidate || DEFAULT_DOMAIN || "animeav1.com").toString().trim();
+  const now = Date.now();
+
+  if (recentCache.data && now - recentCache.ts < RECENT_TTL_MS) {
+    return { ...recentCache.data, cached: true };
+  }
+
+  try {
+    const html = await fetchHtml(`https://${domain}/`);
+    const results = parseRecentEpisodesFromHtml(html, domain);
+    const payload = {
+      success: true,
+      data: { count: results.length, results },
+      source: "html",
+    };
+    recentCache = { ts: now, data: payload };
+    return { ...payload };
+  } catch (error) {
+    if (recentCache.data) {
+      return { ...recentCache.data, cached: true, stale: true };
+    }
+    throw error;
+  }
+}
+
 module.exports = {
   searchAnime,
   getAnimeInfo,
   getEpisodeLinks,
+  getRecentEpisodes,
 };
