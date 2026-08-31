@@ -566,34 +566,102 @@ function renderSeasonGrid(items) {
 
 async function loadJikanFromSeason(malId, title) {
   document.getElementById('detailTitle').textContent = 'Buscando en AnimeAV1...';
-  document.getElementById('detailContent').innerHTML = `<div class="loading"><div class="spinner"></div>Localizando episodios...</div>`;
+  document.getElementById('detailContent').innerHTML = '<div class="loading"><div class="spinner"></div>Localizando episodios...</div>';
   showView('detail');
 
-  try {
-    const data = await apiGet('/api/v1/anime/search', { q: title });
-    const results = data.data?.results || [];
-    let found = results.find(r => r.title.toLowerCase() === title.toLowerCase()) || results[0];
+  const norm = function(s){ if(!s) return ''; return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); };
+  const cleanSlug = function(s){ var x = norm(String(s||'').replace(/_/g,'-')); return x.replace(/-+/g,'-').replace(/^-|-$/g,''); };
+  const terms = function(s){ return norm(s).split(/\s+/).filter(function(t){ return t.length>=4; }); };
 
-    if (found?.url) {
-      await loadAnimeDetail(found.url);
-    } else {
-      // Show MAL data with a note
-      const res = await fetch(`${JIKAN_API}/anime/${malId}`);
-      const json = await res.json();
-      const mal = json.data;
-      document.getElementById('detailContent').innerHTML = `
-        <div class="anime-detail-header">
-          <div class="poster"><img src="${mal.images?.jpg?.image_url||''}" alt="${mal.title}"></div>
-          <div class="info"><h2>${mal.title}</h2>
-            ${mal.title_japanese ? '<p style="color:var(--text2);font-size:13px;margin:0 0 10px;">'+mal.title_japanese+'</p>' : ''}
-            <div class="tags">${mal.type?'<span>'+mal.type+'</span>':''}${mal.status?'<span>'+mal.status+'</span>':''}${mal.episodes?'<span>'+mal.episodes+' ep.</span>':''}${mal.score?'<span>⭐ '+mal.score+'</span>':''}</div>
-            ${mal.synopsis ? '<div class="description">'+mal.synopsis.slice(0,400)+'</div>' : ''}
-          </div>
-        </div>
-        <div class="error-msg" style="margin-top:20px;">⚠️ No disponible en AnimeAV1. Prueba buscándolo por otro nombre.</div>`;
+  try {
+    // 1) Slug canónico + títulos desde MAL (endpoint estable de Jikan)
+    var malSlug = '';
+    var malTitles = [];
+    if (malId) {
+      try {
+        var r = await fetch(JIKAN_API + '/anime/' + malId);
+        var mj = await r.json();
+        var mal = mj.data;
+        if (mal) {
+          var seg = ((mal.url || '').split('/').filter(Boolean).pop() || '');
+          if (seg) malSlug = cleanSlug(seg);
+          [mal.title, mal.title_english, mal.title_japanese].forEach(function(t){ if(t) malTitles.push(norm(t)); });
+          (mal.titles || []).forEach(function(t){ if(t && t.title) malTitles.push(norm(t.title)); });
+        }
+      } catch(_) {}
     }
+
+    // 2) búsqueda por título de la tarjeta (luego se re-busca por slug si hace falta)
+    var data = await apiGet('/api/v1/anime/search', { q: title });
+    var results = data.data?.results || [];
+    var cardTitleNorm = norm(title);
+
+    // 3) match seguro: slug MAL exacto → título MAL exacto → título tarjeta exacto
+    var pickFrom = function(list) {
+      if (malSlug) {
+        for (var i=0;i<list.length;i++){ if (cleanSlug(list[i].slug) === malSlug) return list[i]; }
+      }
+      for (var i=0;i<list.length;i++){ if (malTitles.indexOf(norm(list[i].title)) !== -1) return list[i]; }
+      for (var i=0;i<list.length;i++){ if (norm(list[i].title) === cardTitleNorm) return list[i]; }
+      return null;
+    };
+    var found = pickFrom(results);
+
+    // 4) re-búsqueda por slug MAL (AnimeAV1 usa nombres JA: "Youjo Senki II")
+    if (!found && malSlug) {
+      var data2 = await apiGet('/api/v1/anime/search', { q: malSlug });
+      found = pickFrom(data2.data?.results || []);
+    }
+
+    if (found && found.url) {
+      await loadAnimeDetail(found.url);
+      return;
+    }
+
+    // 5) Sin match seguro: info MAL + candidatos plausibles para elegir (nunca mandar a uno incorrecto)
+    var mal2 = null;
+    if (malId) {
+      try {
+        var rr = await fetch(JIKAN_API + '/anime/' + malId);
+        var jj = await rr.json();
+        mal2 = jj.data;
+      } catch(_) {}
+    }
+    var termsSet = terms(title).concat(terms(malSlug));
+    malTitles.forEach(function(t){ termsSet = termsSet.concat(terms(t)); });
+    var candidates = results.filter(function(x){
+      var hay = norm(x.title) + ' ' + cleanSlug(x.slug);
+      return termsSet.some(function(tm){ return hay.indexOf(tm) !== -1; });
+    });
+
+    var h = '';
+    if (mal2) {
+      var poster = (mal2.images && mal2.images.jpg) ? mal2.images.jpg.image_url : '';
+      h += '<div class="anime-detail-header">';
+      h += '<div class="poster"><img src="' + (poster||'') + '" alt="' + (mal2.title||title) + '"></div>';
+      h += '<div class="info"><h2>' + (mal2.title||title) + '</h2>';
+      if (mal2.title_japanese) h += '<p style="color:var(--text2);font-size:13px;margin:0 0 10px;">' + mal2.title_japanese + '</p>';
+      h += '<div class="tags">';
+      if (mal2.type) h += '<span>' + mal2.type + '</span>';
+      if (mal2.status) h += '<span>' + mal2.status + '</span>';
+      if (mal2.episodes) h += '<span>' + mal2.episodes + ' ep.</span>';
+      if (mal2.score) h += '<span>⭐ ' + mal2.score + '</span>';
+      h += '</div>';
+      if (mal2.synopsis) h += '<div class="description">' + mal2.synopsis.slice(0,400) + '</div>';
+      h += '</div></div>';
+    }
+    if (candidates.length > 0) {
+      h += '<div class="error-msg" style="margin-top:20px;">⚠️ No hay coincidencia exacta en AnimeAV1 — elige cuál es:</div>';
+      candidates.slice(0, 5).forEach(function(x){
+        var tt = String(x.title||'').replace(/"/g,'&quot;').replace(/'/g,"\\'");
+        h += '<button class="btn btn-secondary" style="display:block;width:100%;margin:6px 0;text-align:left;" onclick="loadAnimeDetail(\'' + x.url + '\')">▶ ' + tt + '</button>';
+      });
+    } else {
+      h += '<div class="error-msg" style="margin-top:20px;">⚠️ No disponible en AnimeAV1. Prueba buscándolo por otro nombre.</div>';
+    }
+    document.getElementById('detailContent').innerHTML = h;
   } catch(e) {
-    document.getElementById('detailContent').innerHTML = `<div class="error-msg">❌ ${e.message}</div>`;
+    document.getElementById('detailContent').innerHTML = '<div class="error-msg">❌ ' + e.message + '</div>';
   }
 }
 
