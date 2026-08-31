@@ -453,6 +453,7 @@
 <script>
 const API = window.location.origin;
 const JIKAN_API = 'https://api.jikan.moe/v4';
+const ANILIST_API = 'https://graphql.anilist.co';
 
 let searchSource = 'animeav1';
 let currentAnimeUrl = '';
@@ -479,6 +480,26 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSeasonData(seasonState.year, seasonState.season);
 });
 
+// AniList GraphQL — seasonal directory (Jikan /seasons/ is down: 504 MAL block)
+async function fetchAniListSeason(year, season) {
+  const query = `query($season: MediaSeason, $year: Int) {
+    Page(page: 1, perPage: 25) {
+      media(season: $season, seasonYear: $year, type: ANIME, sort: SCORE_DESC, isAdult: false) {
+        id idMal title { romaji english native } coverImage { large } episodes averageScore format
+      }
+    }
+  }`;
+  const res = await fetch(ANILIST_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ query, variables: { season: season.toUpperCase(), year } })
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const json = await res.json();
+  if (json.errors && json.errors.length) throw new Error(json.errors[0].message);
+  return (json.data && json.data.Page && json.data.Page.media) || [];
+}
+
 async function loadSeasonData(year, season) {
   const grid = document.getElementById('seasonGrid');
   const loading = document.getElementById('seasonLoading');
@@ -491,10 +512,7 @@ async function loadSeasonData(year, season) {
   loading.style.display = '';
 
   try {
-    const res = await fetch(`${JIKAN_API}/seasons/${year}/${season}?limit=25&sfw=true`);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const json = await res.json();
-    const items = json.data || [];
+    const items = await fetchAniListSeason(year, season);
     // Sort by score descending
     items.sort((a, b) => (b.score || 0) - (a.score || 0));
     loading.style.display = 'none';
@@ -514,8 +532,18 @@ async function loadSeasonData(year, season) {
 function renderSeasonGrid(items) {
   const grid = document.getElementById('seasonGrid');
   let html = '';
-  items.forEach((a, i) => {
-    const img = a.images?.jpg?.image_url || a.images?.webp?.image_url || '';
+  items.forEach((raw, i) => {
+    // Normalize AniList fields → same shape the grid expects
+    const a = {
+      title: raw.title?.english || raw.title?.romaji || raw.title?.native || 'Sin título',
+      title_japanese: raw.title?.native || '',
+      mal_id: raw.idMal,
+      image: raw.coverImage?.large || raw.coverImage?.medium || '',
+      type: raw.format || '',
+      episodes: raw.episodes,
+      score: raw.averageScore ? (raw.averageScore / 10).toFixed(1) : null
+    };
+    const img = a.image;
     const initial = (a.title || '?')[0].toUpperCase();
     const imgTag = img
       ? `<img src="${img}" alt="${a.title}" loading="lazy" onerror="this.parentNode.innerHTML='<span class=placeholder>${initial}</span>'">`
