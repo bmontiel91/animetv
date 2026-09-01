@@ -1235,7 +1235,14 @@ function renderPlayer(data, title) {
     }
   }
   document.getElementById('playerContent').innerHTML = html;
-  if (servers.length > 0) selectServer(0, currentVariant);
+  if (servers.length > 0) {
+    // zilla (HLS) bloquea peticiones cross-origin → elegir primero un servidor reproducible
+    let defaultIdx = 0;
+    for (let i = 0; i < servers.length; i++) {
+      if (servers[i].url.toLowerCase().indexOf('zilla-networks') === -1) { defaultIdx = i; break; }
+    }
+    selectServer(defaultIdx, currentVariant);
+  }
 }
 
 function switchVariant(variant) {
