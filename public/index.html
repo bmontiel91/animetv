@@ -1251,6 +1251,7 @@ function renderPlayer(data, title) {
       document.getElementById('playerContainer').innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text2);gap:12px;text-align:center;padding:20px;"><div style="font-size:40px;opacity:0.3;">😔</div><p style="font-size:14px;">Este capítulo no tiene servidores que funcionen desde la app.<br>Prueba con otro capítulo o la versión DUB.</p></div>';
     }
   }
+  if (!moreServersLoaded && currentEpisodeUrl) loadMoreServers();
 }
 
 function switchVariant(variant) {
@@ -1312,24 +1313,36 @@ async function loadMoreServers() {
   try {
     const d = await apiGet('/api/v1/anime/episode', { url: currentEpisodeUrl, more: 1 });
     const srv = (d && d.data && d.data.servers) || {};
-    let added = 0;
+    const nuevos = [];
     ['sub', 'dub'].forEach(v => {
       const list = srv[v] || [];
       if (!currentEpisodeData.servers[v]) currentEpisodeData.servers[v] = [];
       list.forEach(sv => {
         if (!currentEpisodeData.servers[v].some(x => x.url === sv.url)) {
           currentEpisodeData.servers[v].push(sv);
-          added++;
+          nuevos.push({ v: v, srv: sv, idx: currentEpisodeData.servers[v].length - 1 });
         }
       });
     });
-    if (added > 0) {
-      renderPlayer(currentEpisodeData, document.getElementById('playerTitle').textContent);
-    } else if (btn) {
-      btn.textContent = '➕ Más servidores (sin nuevos)';
+    const b = document.getElementById('moreSrvBtn');
+    if (nuevos.length > 0) {
+      const sel = document.querySelector('.server-selector');
+      if (sel) {
+        let h = '';
+        nuevos.forEach(n => {
+          if (n.v !== currentVariant) return; // el selector visible es de la variante actual
+          const label = String(n.srv.server || ('S' + (n.idx + 1))).replace(/'/g, "\'");
+          h += '<button class="server-btn" onclick="selectServer(' + n.idx + ',\'' + n.v + '\')">' + label + (n.srv.quality ? ' (' + n.srv.quality + ')' : '') + '</button>';
+        });
+        sel.insertAdjacentHTML('beforeend', h);
+      }
+      if (b) { const wrap = b.closest('div'); if (wrap) wrap.remove(); }
+    } else if (b) {
+      b.textContent = '➕ Más servidores (sin nuevos)';
     }
   } catch (_e) {
-    if (btn) btn.textContent = '➕ Más servidores (error)';
+    const b2 = document.getElementById('moreSrvBtn');
+    if (b2) b2.textContent = '➕ Más servidores (error)';
   }
 }
 </script>
