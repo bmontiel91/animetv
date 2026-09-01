@@ -964,8 +964,39 @@ async function getEpisodeLinks(urlCandidate, includeMegaRaw, excludeServersRaw) 
   };
 }
 
+const ZILLA_BASE = "https://player.zilla-networks.com";
+
+async function proxyPlayerPage(urlCandidate) {
+  let target;
+  try {
+    target = new URL(urlCandidate);
+  } catch (_error) {
+    throw new ApiError(400, "URL invalida");
+  }
+
+  if (target.hostname !== "player.zilla-networks.com") {
+    throw new ApiError(400, "Solo se permiten players de player.zilla-networks.com");
+  }
+
+  const result = await axios.get(target.toString(), {
+    timeout: Number(process.env.REQUEST_TIMEOUT_MS || 15000),
+    headers: { ...HTTP_HEADERS, Referer: "https://animeav1.com/" },
+    maxRedirects: 5,
+    validateStatus: (status) => status >= 200 && status < 400,
+    responseType: "text",
+  });
+
+  let html = String(result.data || "");
+  // Reescribir URLs relativas a absolutas (la página exige Referer de animeav1
+  // solo para el HTML; assets y m3u8 cargan sin referer).
+  html = html.replace(/(src|href)="\/(assets\/|vite\.svg)/g, `$1="${ZILLA_BASE}/$2`);
+  html = html.replace(/src="\/\/ssl\.p\.jwpcdn\.com\//g, `src="https://ssl.p.jwpcdn.com/`);
+  return html;
+}
+
 module.exports = {
   searchAnime,
   getAnimeInfo,
   getEpisodeLinks,
+  proxyPlayerPage,
 };

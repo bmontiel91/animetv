@@ -1253,7 +1253,11 @@ function selectServer(index, variant) {
   const urlLower = url.toLowerCase();
 
   let html = '';
-  if (urlLower.includes('.m3u8')) {
+  if (urlLower.includes('player.zilla-networks.com/play/')) {
+    // Zilla exige Referer de animeav1.com → pasar por proxy server-side
+    const proxyUrl = '/api/v1/anime/player-proxy?url=' + encodeURIComponent(url);
+    html = '<iframe src="' + proxyUrl + '" allowfullscreen allow="autoplay; encrypted-media" style="width:100%;height:100%;border:none;"></iframe>';
+  } else if (urlLower.includes('.m3u8')) {
     html = `<div id="hlsContainer" style="width:100%;height:100%;background:#000;position:relative;">
       <video id="hlsVideo" controls autoplay playsinline style="width:100%;height:100%;"></video>
       <div id="hlsLoadMsg" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#999;text-align:center;">

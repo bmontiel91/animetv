@@ -179,8 +179,13 @@ async function getEpisodeLinks(urlCandidate, includeMega, excludeServers) {
   };
 }
 
+async function proxyPlayerPage(urlCandidate) {
+  return animeav1Service.proxyPlayerPage(urlCandidate);
+}
+
 module.exports = {
   searchAnime,
   getAnimeInfo,
   getEpisodeLinks,
+  proxyPlayerPage,
 };

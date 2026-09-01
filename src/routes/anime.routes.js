@@ -51,6 +51,19 @@ router.get(
   })
 );
 
+router.get(
+  "/player-proxy",
+  asyncHandler(async (req, res) => {
+    if (!req.query.url) {
+      throw new ApiError(400, "Se requiere el parametro url");
+    }
+    const html = await animeService.proxyPlayerPage(req.query.url);
+    res.set("Content-Type", "text/html; charset=utf-8");
+    res.set("Cache-Control", "no-store");
+    res.status(200).send(html);
+  })
+);
+
 router.post(
   "/download",
   asyncHandler(async (req, res) => {
