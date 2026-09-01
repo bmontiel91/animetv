@@ -1274,6 +1274,9 @@ function selectServer(index, variant) {
       <script>
         (function(){
           var fb='${hlsFallbackSrc||''}';
+          var nxt=${index+1},total=${servers.length};
+          var watchdog=setTimeout(function(){ if(v.currentTime===0){ if(nxt<total&&typeof selectServer==='function'){ clearTimeout(watchdog); selectServer(nxt,'${currentVariant}'); } } },12000);
+          v.addEventListener('playing',function(){clearTimeout(watchdog);});
           var v=document.getElementById('hlsVideo'),m=document.getElementById('hlsLoadMsg'),u='${url.replace(/'/g,"\\'")}';
           if(typeof Hls!=='undefined'&&Hls.isSupported()){var h=new Hls();h.loadSource(u);h.attachMedia(v);
             h.on(Hls.Events.MANIFEST_PARSED,function(){if(m)m.style.display='none';v.play().catch(function(){})});
