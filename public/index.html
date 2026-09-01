@@ -1253,23 +1253,32 @@ function selectServer(index, variant) {
   const urlLower = url.toLowerCase();
 
   let html = '';
+  let hlsFallbackSrc = null;
   if (urlLower.includes('player.zilla-networks.com/play/')) {
-    // Zilla exige Referer de animeav1.com → pasar por proxy server-side
-    const proxyUrl = '/api/v1/anime/player-proxy?url=' + encodeURIComponent(url);
-    html = '<iframe src="' + proxyUrl + '" allowfullscreen allow="autoplay; encrypted-media" style="width:100%;height:100%;border:none;"></iframe>';
-  } else if (urlLower.includes('.m3u8')) {
+    // Zilla: el m3u8 es CORS abierto → reproducir directo con hls.js (sin publicidad).
+    // Fallback: play page via proxy server-side (exige Referer de animeav1).
+    const hashParts = url.split('/').filter(Boolean);
+    const hash = (hashParts.pop() || '').split('?')[0];
+    if (hash) {
+      url = 'https://player.zilla-networks.com/m3u8/' + hash;
+      urlLower = url.toLowerCase();
+      hlsFallbackSrc = '/api/v1/anime/player-proxy/' + hash;
+    }
+  }
+  if (urlLower.includes('.m3u8') || urlLower.includes('player.zilla-networks.com/m3u8/')) {
     html = `<div id="hlsContainer" style="width:100%;height:100%;background:#000;position:relative;">
       <video id="hlsVideo" controls autoplay playsinline style="width:100%;height:100%;"></video>
       <div id="hlsLoadMsg" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#999;text-align:center;">
         <div class="spinner"></div><p style="margin-top:8px;font-size:13px;">Cargando stream...</p></div></div>
       <script>
         (function(){
+          var fb='${hlsFallbackSrc||''}';
           var v=document.getElementById('hlsVideo'),m=document.getElementById('hlsLoadMsg'),u='${url.replace(/'/g,"\\'")}';
           if(typeof Hls!=='undefined'&&Hls.isSupported()){var h=new Hls();h.loadSource(u);h.attachMedia(v);
             h.on(Hls.Events.MANIFEST_PARSED,function(){if(m)m.style.display='none';v.play().catch(function(){})});
-            h.on(Hls.Events.ERROR,function(e,d){if(d.fatal){var c=document.getElementById('hlsContainer');if(c)c.innerHTML='<iframe src=\"'+u+'\" allowfullscreen allow=\"autoplay; encrypted-media\" style=\"width:100%;height:100%;border:none;\"></iframe>';}});}
+            h.on(Hls.Events.ERROR,function(e,d){if(d.fatal){var c=document.getElementById('hlsContainer');if(c)c.innerHTML='<iframe src=\"'+(fb||u)+'\" allowfullscreen allow=\"autoplay; encrypted-media\" style=\"width:100%;height:100%;border:none;\"></iframe>';}});}
           else if(v.canPlayType('application/vnd.apple.mpegurl')){v.src=u;if(m)m.style.display='none';}
-          else{document.getElementById('hlsContainer').innerHTML='<iframe src=\"'+u+'\" allowfullscreen allow=\"autoplay; encrypted-media\" style=\"width:100%;height:100%;border:none;\"></iframe>';}
+          else{document.getElementById('hlsContainer').innerHTML='<iframe src=\"'+(fb||u)+'\" allowfullscreen allow=\"autoplay; encrypted-media\" style=\"width:100%;height:100%;border:none;\"></iframe>';}
         })();
       <\/script>`;
   } else if (urlLower.includes('embed') || urlLower.includes('player.') || urlLower.includes('stream')) {

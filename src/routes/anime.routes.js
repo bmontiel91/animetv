@@ -64,6 +64,20 @@ router.get(
   })
 );
 
+router.get(
+  "/player-proxy/:hash",
+  asyncHandler(async (req, res) => {
+    const hash = String(req.params.hash || "");
+    if (!/^[a-f0-9]{32}$/i.test(hash)) {
+      throw new ApiError(400, "Hash de player invalido");
+    }
+    const html = await animeService.proxyPlayerPage("https://player.zilla-networks.com/play/" + hash);
+    res.set("Content-Type", "text/html; charset=utf-8");
+    res.set("Cache-Control", "public, max-age=600");
+    res.status(200).send(html);
+  })
+);
+
 router.post(
   "/download",
   asyncHandler(async (req, res) => {
