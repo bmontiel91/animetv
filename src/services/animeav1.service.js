@@ -1039,12 +1039,15 @@ const VIDEO_EMBED_HOSTS = {
   "www.mp4upload.com": "https://www.mp4upload.com/",
   "mp4upload.com": "https://www.mp4upload.com/",
 };
-const VIDEO_DIRECT_HOSTS = {
-  "vidcache.net": "https://www.yourupload.com/",
-  "a4.mp4upload.com": "https://www.mp4upload.com/",
-  "www.mp4upload.com": "https://www.mp4upload.com/",
-  "mp4upload.com": "https://www.mp4upload.com/",
-};
+function videoRefererFor(hostname) {
+  if (hostname === "vidcache.net") {
+    return "https://www.yourupload.com/";
+  }
+  if (hostname === "mp4upload.com" || hostname.endsWith(".mp4upload.com")) {
+    return "https://www.mp4upload.com/";
+  }
+  return null;
+}
 
 async function resolveDirectVideo(embedUrlCandidate) {
   let target;
@@ -1086,7 +1089,7 @@ async function proxyVideoStream(urlCandidate, rangeHeader) {
     throw new ApiError(400, "URL invalida");
   }
 
-  const referer = VIDEO_DIRECT_HOSTS[target.hostname];
+  const referer = videoRefererFor(target.hostname);
   if (!referer) {
     throw new ApiError(400, "Servidor de video no permitido");
   }
