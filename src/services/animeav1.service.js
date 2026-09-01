@@ -1019,7 +1019,7 @@ async function proxyHlsStream(urlCandidate, rangeHeader) {
     timeout: Number(process.env.REQUEST_TIMEOUT_MS || 20000),
     headers,
     maxRedirects: 5,
-    validateStatus: (status) => status >= 200 && status < 400,
+    validateStatus: () => true,
     responseType: "arraybuffer",
   });
 

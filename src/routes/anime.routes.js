@@ -85,13 +85,19 @@ router.get(
       throw new ApiError(400, "Se requiere el parametro url");
     }
     const up = await animeService.proxyHlsStream(req.query.url, req.headers.range || null);
-    res.status(up.status);
+    if (up.status >= 200 && up.status < 300) {
+      res.status(up.status);
+    } else {
+      res.status(502).json({ success: false, message: "Origen rechazo la peticion", upstream: up.status });
+      return;
+    }
     if (up.contentType) res.set("Content-Type", up.contentType);
     if (up.contentRange) res.set("Content-Range", up.contentRange);
     if (up.acceptRanges) res.set("Accept-Ranges", up.acceptRanges);
     if (up.isManifest) {
       // Reescribir URLs de segmentos/manifests → este proxy (same-origin, sin CORS)
-      const selfBase = `${req.protocol}://${req.get("host")}`;
+      const proto = req.headers["x-forwarded-proto"] || req.protocol;
+      const selfBase = `${proto}://${req.get("host")}`;
       const proxyPrefix = selfBase + "/api/v1/anime/hls-proxy?url=";
       let text = up.body.toString("utf-8");
       text = text.replace(
