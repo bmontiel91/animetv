@@ -994,9 +994,49 @@ async function proxyPlayerPage(urlCandidate) {
   return html;
 }
 
+async function proxyHlsStream(urlCandidate, rangeHeader) {
+  let target;
+  try {
+    target = new URL(urlCandidate);
+  } catch (_error) {
+    throw new ApiError(400, "URL invalida");
+  }
+
+  if (target.hostname !== "player.zilla-networks.com") {
+    throw new ApiError(400, "Solo se permiten hosts de player.zilla-networks.com");
+  }
+
+  const headers = {
+    ...HTTP_HEADERS,
+    Accept: "application/vnd.apple.mpegurl, video/mp4, */*;q=0.8",
+    Referer: "https://animeav1.com/",
+  };
+  if (rangeHeader) {
+    headers.Range = rangeHeader;
+  }
+
+  const result = await axios.get(target.toString(), {
+    timeout: Number(process.env.REQUEST_TIMEOUT_MS || 20000),
+    headers,
+    maxRedirects: 5,
+    validateStatus: (status) => status >= 200 && status < 400,
+    responseType: "arraybuffer",
+  });
+
+  return {
+    status: result.status,
+    body: Buffer.from(result.data || []),
+    contentType: result.headers["content-type"] || null,
+    contentRange: result.headers["content-range"] || null,
+    acceptRanges: result.headers["accept-ranges"] || null,
+    isManifest: /\/m3u8(\/|$)/.test(target.pathname) || target.pathname.endsWith(".m3u8"),
+  };
+}
+
 module.exports = {
   searchAnime,
   getAnimeInfo,
   getEpisodeLinks,
   proxyPlayerPage,
+  proxyHlsStream,
 };

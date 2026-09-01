@@ -183,9 +183,14 @@ async function proxyPlayerPage(urlCandidate) {
   return animeav1Service.proxyPlayerPage(urlCandidate);
 }
 
+async function proxyHlsStream(urlCandidate, rangeHeader) {
+  return animeav1Service.proxyHlsStream(urlCandidate, rangeHeader);
+}
+
 module.exports = {
   searchAnime,
   getAnimeInfo,
   getEpisodeLinks,
   proxyPlayerPage,
+  proxyHlsStream,
 };

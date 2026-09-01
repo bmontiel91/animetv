@@ -78,6 +78,35 @@ router.get(
   })
 );
 
+router.get(
+  "/hls-proxy",
+  asyncHandler(async (req, res) => {
+    if (!req.query.url) {
+      throw new ApiError(400, "Se requiere el parametro url");
+    }
+    const up = await animeService.proxyHlsStream(req.query.url, req.headers.range || null);
+    res.status(up.status);
+    if (up.contentType) res.set("Content-Type", up.contentType);
+    if (up.contentRange) res.set("Content-Range", up.contentRange);
+    if (up.acceptRanges) res.set("Accept-Ranges", up.acceptRanges);
+    if (up.isManifest) {
+      // Reescribir URLs de segmentos/manifests → este proxy (same-origin, sin CORS)
+      const selfBase = `${req.protocol}://${req.get("host")}`;
+      const proxyPrefix = selfBase + "/api/v1/anime/hls-proxy?url=";
+      let text = up.body.toString("utf-8");
+      text = text.replace(
+        /https:\/\/player\.zilla-networks\.com\/(segs|m3u8)\//g,
+        (match, kind) => proxyPrefix + encodeURIComponent(`https://player.zilla-networks.com/${kind}/`)
+      );
+      res.set("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8");
+      res.send(text);
+    } else {
+      res.set("Cache-Control", "public, max-age=300");
+      res.send(up.body);
+    }
+  })
+);
+
 router.post(
   "/download",
   asyncHandler(async (req, res) => {

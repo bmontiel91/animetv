@@ -1260,7 +1260,8 @@ function selectServer(index, variant) {
     const hashParts = url.split('/').filter(Boolean);
     const hash = (hashParts.pop() || '').split('?')[0];
     if (hash) {
-      url = 'https://player.zilla-networks.com/m3u8/' + hash;
+      // Fuente = manifest vía proxy same-origin (segmentos sin CORS)
+      url = '/api/v1/anime/hls-proxy?url=' + encodeURIComponent('https://player.zilla-networks.com/m3u8/' + hash);
       urlLower = url.toLowerCase();
       hlsFallbackSrc = '/api/v1/anime/player-proxy/' + hash;
     }
