@@ -1033,10 +1033,91 @@ async function proxyHlsStream(urlCandidate, rangeHeader) {
   };
 }
 
+const VIDEO_EMBED_HOSTS = {
+  "www.yourupload.com": "https://www.yourupload.com/",
+  "yourupload.com": "https://www.yourupload.com/",
+  "www.mp4upload.com": "https://www.mp4upload.com/",
+  "mp4upload.com": "https://www.mp4upload.com/",
+};
+const VIDEO_DIRECT_HOSTS = {
+  "vidcache.net": "https://www.yourupload.com/",
+  "a4.mp4upload.com": "https://www.mp4upload.com/",
+  "mp4upload.com": "https://www.mp4upload.com/",
+};
+
+async function resolveDirectVideo(embedUrlCandidate) {
+  let target;
+  try {
+    target = new URL(embedUrlCandidate);
+  } catch (_error) {
+    return { ok: false, direct: null };
+  }
+
+  const referer = VIDEO_EMBED_HOSTS[target.hostname];
+  if (!referer) {
+    return { ok: false, direct: null };
+  }
+
+  try {
+    const result = await axios.get(target.toString(), {
+      timeout: Number(process.env.REQUEST_TIMEOUT_MS || 15000),
+      headers: { ...HTTP_HEADERS, Referer: referer },
+      maxRedirects: 5,
+      validateStatus: (status) => status >= 200 && status < 400,
+      responseType: "text",
+    });
+    const html = String(result.data || "");
+    const found = html.match(/https?:\/\/[^"'\s<>]+\.(?:mp4|m3u8)[^"'\s<>]*/i);
+    if (!found) {
+      return { ok: false, direct: null };
+    }
+    return { ok: true, direct: found[0] };
+  } catch (_error) {
+    return { ok: false, direct: null };
+  }
+}
+
+async function proxyVideoStream(urlCandidate, rangeHeader) {
+  let target;
+  try {
+    target = new URL(urlCandidate);
+  } catch (_error) {
+    throw new ApiError(400, "URL invalida");
+  }
+
+  const referer = VIDEO_DIRECT_HOSTS[target.hostname];
+  if (!referer) {
+    throw new ApiError(400, "Servidor de video no permitido");
+  }
+
+  const headers = { ...HTTP_HEADERS, Referer: referer };
+  if (rangeHeader) {
+    headers.Range = rangeHeader;
+  }
+
+  const result = await axios.get(target.toString(), {
+    timeout: Number(process.env.REQUEST_TIMEOUT_MS || 20000),
+    headers,
+    maxRedirects: 5,
+    validateStatus: () => true,
+    responseType: "arraybuffer",
+  });
+
+  return {
+    status: result.status,
+    body: Buffer.from(result.data || []),
+    contentType: result.headers["content-type"] || "application/octet-stream",
+    contentRange: result.headers["content-range"] || null,
+    acceptRanges: result.headers["accept-ranges"] || null,
+  };
+}
+
 module.exports = {
   searchAnime,
   getAnimeInfo,
   getEpisodeLinks,
   proxyPlayerPage,
   proxyHlsStream,
+  resolveDirectVideo,
+  proxyVideoStream,
 };

@@ -1283,6 +1283,14 @@ function selectServer(index, variant) {
         })();
       <\/script>`;
   } else if (urlLower.includes('embed') || urlLower.includes('player.') || urlLower.includes('stream')) {
+    // YourUpload / MP4Upload: intentar stream directo sin publicidad (via proxy); fallback al embed
+    let embedHost = '';
+    try { embedHost = new URL(url).hostname || ''; } catch (_) {}
+    if (embedHost.indexOf('yourupload') !== -1 || embedHost.indexOf('mp4upload') !== -1) {
+      container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text2);gap:10px;"><div class="spinner"></div><span>Buscando stream directo...</span></div>';
+      tryDirectVideo(container, url, embedHost);
+      return;
+    }
     html = `<iframe src="${url}" allowfullscreen allow="autoplay; encrypted-media" style="width:100%;height:100%;border:none;"></iframe>`;
   } else if (urlLower.includes('.mp4') || urlLower.includes('.webm')) {
     html = `<video controls autoplay playsinline style="width:100%;height:100%;background:#000;"><source src="${url}"></video>`;
@@ -1290,6 +1298,18 @@ function selectServer(index, variant) {
     html = `<iframe src="${url}" allowfullscreen allow="autoplay; encrypted-media" style="width:100%;height:100%;border:none;"></iframe>`;
   }
   container.innerHTML = html;
+}
+
+async function tryDirectVideo(container, embedUrl, host) {
+  try {
+    const d = await apiGet('/api/v1/anime/resolve-video', { url: embedUrl });
+    if (d && d.success && d.data && d.data.direct) {
+      const proxyUrl = '/api/v1/anime/video-proxy?url=' + encodeURIComponent(d.data.direct);
+      container.innerHTML = '<video controls autoplay playsinline style="width:100%;height:100%;background:#000;"><source src="' + proxyUrl + '"></video>';
+      return;
+    }
+  } catch (_) {}
+  container.innerHTML = '<iframe src="' + embedUrl + '" allowfullscreen allow="autoplay; encrypted-media" style="width:100%;height:100%;border:none;"></iframe>';
 }
 </script>
 </body>

@@ -187,10 +187,20 @@ async function proxyHlsStream(urlCandidate, rangeHeader) {
   return animeav1Service.proxyHlsStream(urlCandidate, rangeHeader);
 }
 
+async function resolveDirectVideo(urlCandidate) {
+  return animeav1Service.resolveDirectVideo(urlCandidate);
+}
+
+async function proxyVideoStream(urlCandidate, rangeHeader) {
+  return animeav1Service.proxyVideoStream(urlCandidate, rangeHeader);
+}
+
 module.exports = {
   searchAnime,
   getAnimeInfo,
   getEpisodeLinks,
   proxyPlayerPage,
   proxyHlsStream,
+  resolveDirectVideo,
+  proxyVideoStream,
 };

@@ -113,6 +113,37 @@ router.get(
   })
 );
 
+router.get(
+  "/resolve-video",
+  asyncHandler(async (req, res) => {
+    if (!req.query.url) {
+      throw new ApiError(400, "Se requiere el parametro url");
+    }
+    const out = await animeService.resolveDirectVideo(req.query.url);
+    res.status(200).json({ success: out.ok, data: out });
+  })
+);
+
+router.get(
+  "/video-proxy",
+  asyncHandler(async (req, res) => {
+    if (!req.query.url) {
+      throw new ApiError(400, "Se requiere el parametro url");
+    }
+    const up = await animeService.proxyVideoStream(req.query.url, req.headers.range || null);
+    if (up.status >= 200 && up.status < 300) {
+      res.status(up.status);
+      res.set("Content-Type", up.contentType);
+      res.set("Accept-Ranges", "bytes");
+      if (up.contentRange) res.set("Content-Range", up.contentRange);
+      res.set("Cache-Control", "public, max-age=300");
+      res.send(up.body);
+    } else {
+      res.status(502).json({ success: false, message: "Origen rechazo el video", upstream: up.status });
+    }
+  })
+);
+
 router.post(
   "/download",
   asyncHandler(async (req, res) => {
