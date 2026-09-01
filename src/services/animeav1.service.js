@@ -1042,6 +1042,7 @@ const VIDEO_EMBED_HOSTS = {
 const VIDEO_DIRECT_HOSTS = {
   "vidcache.net": "https://www.yourupload.com/",
   "a4.mp4upload.com": "https://www.mp4upload.com/",
+  "www.mp4upload.com": "https://www.mp4upload.com/",
   "mp4upload.com": "https://www.mp4upload.com/",
 };
 
@@ -1067,7 +1068,7 @@ async function resolveDirectVideo(embedUrlCandidate) {
       responseType: "text",
     });
     const html = String(result.data || "");
-    const found = html.match(/https?:\/\/[^"'\s<>]+\.(?:mp4|m3u8)[^"'\s<>]*/i);
+    const found = html.match(/https?:\/\/[^"'\s<>]*?\/[^"'\s<>]*\.(?:mp4|m3u8)(?:\?[^"'\s<>]*)?/i);
     if (!found) {
       return { ok: false, direct: null };
     }
