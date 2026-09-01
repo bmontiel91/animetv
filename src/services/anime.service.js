@@ -179,8 +179,8 @@ async function getEpisodeLinks(urlCandidate, includeMega, excludeServers, morePr
   };
 
   // "Más servidores": buscar el mismo episodio en los otros proveedores (TioAnime, JKAnime, AnimeFLV)
-  if (moreProviders && response?.data?.servers && response?.data?.anime && response?.data?.anime?.title) {
-    const title = response.data.anime.title;
+  if (moreProviders && response?.data?.servers && response?.data?.title) {
+    const title = response.data.title;
     const epNum = response.data.episode;
     for (const other of PROVIDERS) {
       if (other.id === provider.id) continue;
