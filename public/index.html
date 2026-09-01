@@ -1249,8 +1249,8 @@ function selectServer(index, variant) {
   document.querySelectorAll('.server-btn').forEach((b,i) => b.classList.toggle('active', i===index));
   const srv = servers[index];
   const container = document.getElementById('playerContainer');
-  const url = srv.url;
-  const urlLower = url.toLowerCase();
+  let url = srv.url;
+  let urlLower = url.toLowerCase();
 
   let html = '';
   let hlsFallbackSrc = null;
