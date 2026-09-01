@@ -166,17 +166,52 @@ async function getAnimeInfo(urlCandidate) {
   };
 }
 
-async function getEpisodeLinks(urlCandidate, includeMega, excludeServers) {
+async function getEpisodeLinks(urlCandidate, includeMega, excludeServers, moreProviders) {
   const provider = findProviderForUrl(urlCandidate) || PROVIDERS[0];
   if (!provider) {
     throw new ApiError(400, "Proveedor no soportado");
   }
 
   const result = await provider.service.getEpisodeLinks(urlCandidate, includeMega, excludeServers);
-  return {
+  const response = {
     ...result,
     source: result?.source || provider.id,
   };
+
+  // "Más servidores": buscar el mismo episodio en los otros proveedores (TioAnime, JKAnime, AnimeFLV)
+  if (moreProviders && response?.data?.servers && response?.data?.anime && response?.data?.anime?.title) {
+    const title = response.data.anime.title;
+    const epNum = response.data.episode;
+    for (const other of PROVIDERS) {
+      if (other.id === provider.id) continue;
+      try {
+        const search = await searchAnime(title, other.domains[0]);
+        const candidates = search?.data?.results || [];
+        if (!candidates.length) continue;
+        const info = await getAnimeInfo(candidates[0].url);
+        const episodes = info?.data?.episodes || [];
+        const target = episodes.find((e) => String(e.number || '').trim() === String(epNum || '').trim() ||
+          (String(e.title || '').toLowerCase().replace(/episodio|episode|cap[ií]tulo/g, '').trim() === String(epNum || '').trim())) ||
+          (episodes.length === 1 ? episodes[0] : null);
+        if (!target?.url) continue;
+        const extra = await getEpisodeLinks(target.url, false, excludeServers, false);
+        const extraServers = extra?.data?.servers || {};
+        for (const variant of ["sub", "dub"]) {
+          const list = extraServers[variant] || [];
+          if (!response.data.servers[variant]) response.data.servers[variant] = [];
+          for (const serv of list) {
+            if (!response.data.servers[variant].some((x) => x.url === serv.url)) {
+              response.data.servers[variant].push({ ...serv, extra: other.id });
+            }
+          }
+        }
+      } catch (_error) {
+        // un proveedor caído no rompe el resto
+      }
+    }
+  }
+
+  return response;
 }
 
 async function proxyPlayerPage(urlCandidate) {

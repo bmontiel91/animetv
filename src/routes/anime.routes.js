@@ -46,7 +46,7 @@ router.get(
       throw new ApiError(400, "Se requiere el parametro url");
     }
 
-    const response = await animeService.getEpisodeLinks(req.query.url, req.query.includeMega, req.query.excludeServers);
+    const response = await animeService.getEpisodeLinks(req.query.url, req.query.includeMega, req.query.excludeServers, req.query.more === "1" || req.query.more === "true");
     res.status(200).json(response);
   })
 );

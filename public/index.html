@@ -1195,6 +1195,7 @@ async function loadEpisode(url, title) {
 
 let currentVariant = 'sub';
 let currentEpisodeData = null;
+let moreServersLoaded = false;
 
 function renderPlayer(data, title) {
   currentEpisodeData = data;
@@ -1233,6 +1234,9 @@ function renderPlayer(data, title) {
       dl.forEach(link => html += `<a href="${link.url}" target="_blank">${link.server}${link.quality?' ('+link.quality+')':''}</a>`);
       html += `</div>`;
     }
+  }
+  if (!moreServersLoaded) {
+    html += '<div style="padding:8px 4px;text-align:center;"><button class="btn" id="moreSrvBtn" onclick="loadMoreServers()">➕ Más servidores</button></div>';
   }
   document.getElementById('playerContent').innerHTML = html;
   if (servers.length > 0) {
@@ -1298,6 +1302,35 @@ function selectServer(index, variant) {
     html = `<iframe src="${url}" allowfullscreen allow="autoplay; encrypted-media" style="width:100%;height:100%;border:none;"></iframe>`;
   }
   container.innerHTML = html;
+}
+
+async function loadMoreServers() {
+  if (!currentEpisodeUrl || moreServersLoaded || !currentEpisodeData) return;
+  moreServersLoaded = true;
+  const btn = document.getElementById('moreSrvBtn');
+  if (btn) btn.textContent = '🔍 Buscando más servidores...';
+  try {
+    const d = await apiGet('/api/v1/anime/episode', { url: currentEpisodeUrl, more: 1 });
+    const srv = (d && d.data && d.data.servers) || {};
+    let added = 0;
+    ['sub', 'dub'].forEach(v => {
+      const list = srv[v] || [];
+      if (!currentEpisodeData.servers[v]) currentEpisodeData.servers[v] = [];
+      list.forEach(sv => {
+        if (!currentEpisodeData.servers[v].some(x => x.url === sv.url)) {
+          currentEpisodeData.servers[v].push(sv);
+          added++;
+        }
+      });
+    });
+    if (added > 0) {
+      renderPlayer(currentEpisodeData, document.getElementById('playerTitle').textContent);
+    } else if (btn) {
+      btn.textContent = '➕ Más servidores (sin nuevos)';
+    }
+  } catch (_e) {
+    if (btn) btn.textContent = '➕ Más servidores (error)';
+  }
 }
 </script>
 </body>
