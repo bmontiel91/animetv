@@ -1214,8 +1214,7 @@ function renderPlayer(data, title) {
   if (servers.length > 0) {
     html += `<div class="server-selector">`;
     servers.forEach((srv, i) => {
-      if (srv.url.toLowerCase().indexOf('zilla-networks') !== -1) return; // servidor muerto (WAF cross-origin)
-      html += `<button class="server-btn" data-idx="${i}" onclick="selectServer(${i},'${currentVariant}')">${srv.server||'S'+(i+1)}${srv.quality?' ('+srv.quality+')':''}</button>`;
+      html += `<button class="server-btn ${i===0?'active':''}" onclick="selectServer(${i},'${currentVariant}')">${srv.server||'S'+(i+1)}${srv.quality?' ('+srv.quality+')':''}</button>`;
     });
     html += `</div>`;
   }
@@ -1225,7 +1224,6 @@ function renderPlayer(data, title) {
   if (servers.length > 0) {
     html += `<div class="direct-links"><h3>🔗 Enlaces directos</h3>`;
     servers.forEach((srv, i) => {
-      if (srv.url.toLowerCase().indexOf('zilla-networks') !== -1) return;
       html += `<a href="${srv.url}" target="_blank">${srv.server}${srv.quality?' ('+srv.quality+')':''}</a>`;
     });
     html += `</div>`;
@@ -1259,7 +1257,7 @@ function switchVariant(variant) {
 function selectServer(index, variant) {
   const servers = currentEpisodeData.servers[variant];
   if (!servers?.[index]) return;
-  document.querySelectorAll('.server-btn').forEach(b => b.classList.toggle('active', Number(b.dataset.idx) === index));
+  document.querySelectorAll('.server-btn').forEach((b,i) => b.classList.toggle('active', i===index));
   const srv = servers[index];
   const container = document.getElementById('playerContainer');
   const url = srv.url;
