@@ -80,7 +80,11 @@ async function fetchPlutoChannels() {
         };
       })
       .filter((c) => c.stream)
-      .filter((c, i, arr) => arr.findIndex((x) => x.slug === c.slug) === i); // dedupe por slug (el API repite algunos)
+      // dedupe por NOMBRE normalizado (el API repite canales con slugs "-2", p.ej. CBS News)
+      .filter((c, i, arr) => {
+        const key = String(c.name || "").toLowerCase().trim();
+        return arr.findIndex((x) => String(x.name || "").toLowerCase().trim() === key) === i;
+      });
     plutoCache = { ts: now, data: channels, error: null };
     return channels;
   } catch (error) {
