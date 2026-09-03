@@ -58,7 +58,10 @@ async function fetchPlutoChannels() {
     });
     const raw = Array.isArray(res.data) ? res.data : [];
     const channels = raw
-      .filter((c) => PLUTO_SLUG_WHITELIST.has(String(c.slug || "")) || PLUTO_CAT_WHITELIST.has(String(c.category || "")))
+      .filter((c) => {
+        const cat = normalizeCategory(c.category);
+        return PLUTO_SLUG_WHITELIST.has(String(c.slug || "")) || cat === "deportes" || cat === "anime" || cat === "noticias";
+      })
       .map((c) => {
         const stitched = c.stitched || {};
         const urls = Array.isArray(stitched.urls) ? stitched.urls : [];
