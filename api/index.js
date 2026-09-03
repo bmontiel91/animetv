@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const animeRoutes = require("../src/routes/anime.routes");
+const tvRoutes = require("../src/routes/tv.routes");
 const { ApiError } = require("../src/utils/api-error");
 
 const app = express();
@@ -21,6 +22,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/v1/anime", animeRoutes);
 app.use("/api/anime1v", animeRoutes);
+app.use("/api/v1/tv", tvRoutes);
 
 app.use((_req, _res, next) => {
   next(new ApiError(404, "Endpoint no encontrado"));
