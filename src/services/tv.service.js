@@ -79,7 +79,8 @@ async function fetchPlutoChannels() {
           web: true,
         };
       })
-      .filter((c) => c.stream);
+      .filter((c) => c.stream)
+      .filter((c, i, arr) => arr.findIndex((x) => x.slug === c.slug) === i); // dedupe por slug (el API repite algunos)
     plutoCache = { ts: now, data: channels, error: null };
     return channels;
   } catch (error) {
